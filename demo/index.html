@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>polyjev demo</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg: #f6f7f9; --card: #fff; --ink: #1c1f24; --muted: #6b7280; --line: #e3e6ea; --accent: #4f46e5; --bar: #c7d2fe; --err: #b91c1c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --card: #171a21; --ink: #e8eaed; --muted: #9aa1ab; --line: #2a2f38; --accent: #818cf8; --bar: #3730a3; --err: #f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+  header h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+  header p { margin: 4px 0 16px; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=password], textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { min-height: 96px; resize: vertical; }
+  .grow { flex: 1 1 260px; }
+  button { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .jevs { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+  .jev { text-align: left; padding: 10px; }
+  .jev[aria-pressed=true] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .jev small { display: block; color: var(--muted); }
+  .task { color: var(--muted); margin: 0 0 12px; }
+  .inputs { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .preview img, .preview video { max-width: 100%; max-height: 220px; border-radius: 8px; display: block; margin-top: 8px; }
+  .preview audio { width: 100%; margin-top: 8px; }
+  .bars { display: grid; gap: 6px; }
+  .bar { position: relative; padding: 6px 10px; border-radius: 6px; background: var(--bg); overflow: hidden; display: flex; justify-content: space-between; gap: 12px; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--bar); z-index: 0; transition: width .4s; }
+  .bar span { position: relative; z-index: 1; }
+  .bar.top { font-weight: 700; }
+  .status { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .error { color: var(--err); white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); text-transform: uppercase; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>polyjev</h1>
+    <p>Typed answers from any modality, one forward pass. Pick a Jev, give it input, and read the probability of every option.</p>
+  </header>
+
+  <section class="card row">
+    <div class="grow"><label for="api">API URL</label><input id="api" type="text" placeholder="https://….execute-api.….amazonaws.com"></div>
+    <div class="grow"><label for="token">Bearer token</label><input id="token" type="password" placeholder="from .token"></div>
+  </section>
+
+  <section class="card">
+    <label>Jev</label>
+    <div class="jevs" id="jevs"></div>
+  </section>
+
+  <section class="card">
+    <p class="task" id="task"></p>
+    <div class="inputs" id="inputs"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="sample">Load sample</button>
+      <button id="run" class="primary">Classify</button>
+      <span class="status" id="status"></span>
+    </div>
+  </section>
+
+  <section class="card" id="result" hidden></section>
+
+  <section class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><strong>Showcase</strong> <span class="status">run every Jev on its bundled sample, in parallel</span></div>
+      <button id="all">Run all 15</button>
+    </div>
+    <table id="table" hidden><thead><tr><th>Jev</th><th>Top answer</th><th>p</th><th>Time</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+
+<script>
+const JEVS = ["text", "image", "audio", "video", "text-image", "text-audio", "text-video", "image-audio", "image-video",
+  "audio-video", "text-image-audio", "text-image-video", "text-audio-video", "image-audio-video", "text-image-audio-video"];
+const EXT = { text: "txt", image: "png", audio: "wav", video: "mp4" };
+const ACCEPT = { image: "image/*", audio: "audio/*", video: "video/*" };
+// Request fields match each handler: with video in the mix, the audio comes from the clip's soundtrack.
+const fields = jev => { const m = jev.split("-"); return m.includes("video") ? m.filter(x => x !== "audio") : m; };
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
+                set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+
+const params = new URLSearchParams(location.search), hash = new URLSearchParams(location.hash.slice(1));
+$("api").value = params.get("api") || store.get("api");
+$("token").value = hash.get("token") || store.get("token");
+for (const id of ["api", "token"]) $(id).addEventListener("change", e => store.set(id, e.target.value.trim()));
+if (hash.has("token")) { store.set("token", hash.get("token")); history.replaceState(null, "", location.pathname + location.search); }
+
+let jev = "text", values = {};
+
+// Each Jev's task is the first line of its docstring, e.g. """text: triage an email as legitimate, spam, or phishing."""
+const tasks = {};
+async function task(j) {
+  if (!(j in tasks)) {
+    const src = await fetch(`../${j}/jev.py`).then(r => r.ok ? r.text() : "").catch(() => "");
+    tasks[j] = (src.match(/"""[^:]*:\s*([^"]+?)"""/) || [, ""])[1];
+  }
+  return tasks[j];
+}
+
+function renderJevs() {
+  $("jevs").innerHTML = "";
+  for (const j of JEVS) {
+    const b = document.createElement("button");
+    b.className = "jev"; b.setAttribute("aria-pressed", j === jev);
+    b.innerHTML = `<strong>${j}</strong><small>${fields(j).length} input${fields(j).length > 1 ? "s" : ""}</small>`;
+    b.onclick = () => select(j);
+    $("jevs").append(b);
+  }
+}
+
+async function select(j) {
+  jev = j; values = {}; renderJevs();
+  $("result").hidden = true; $("status").textContent = "";
+  $("inputs").innerHTML = "";
+  for (const f of fields(j)) {
+    const box = document.createElement("div");
+    box.innerHTML = f === "text"
+      ? `<label for="in-text">text</label><textarea id="in-text"></textarea>`
+      : `<label for="in-${f}">${f}</label><input id="in-${f}" type="file" accept="${ACCEPT[f]}"><div class="preview" id="pv-${f}"></div>`;
+    $("inputs").append(box);
+    if (f === "text") $("in-text").oninput = e => values.text = e.target.value;
+    else $(`in-${f}`).onchange = async e => e.target.files[0] && setMedia(f, e.target.files[0]);
+  }
+  $("task").textContent = await task(j);
+}
+
+function setMedia(f, blob) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      values[f] = reader.result.split(",")[1];
+      const tag = { image: "img", audio: "audio", video: "video" }[f];
+      $(`pv-${f}`).innerHTML = `<${tag} src="${reader.result}" ${tag === "img" ? "" : "controls"}></${tag}>`;
+      resolve();
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function sample(j) {
+  const out = {};
+  for (const f of fields(j)) {
+    const r = await fetch(`../${j}/sample.${EXT[f]}`);
+    if (!r.ok) throw new Error(`no sample for ${j}: serve the repo root (just demo)`);
+    out[f] = f === "text" ? await r.text() : await r.blob();
+  }
+  return out;
+}
+
+const b64 = blob => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.readAsDataURL(blob); });
+
+async function classify(j, body, onTick) {
+  const api = $("api").value.trim().replace(/\/$/, ""), headers = { authorization: `Bearer ${$("token").value.trim()}` };
+  if (!api) throw new Error("set the API URL first");
+  const start = performance.now(), tick = setInterval(() => onTick((performance.now() - start) / 1000), 250);
+  try {
+    const r = await fetch(`${api}/jevs/${j}`, { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(body) });
+    const { job, error } = await r.json();
+    if (!r.ok) throw new Error(error || r.statusText);
+    for (;;) {
+      await new Promise(res => setTimeout(res, 1500));
+      const p = await fetch(`${api}/jobs/${job}`, { headers });
+      if (p.status === 202) continue;
+      const out = await p.json();
+      if (!p.ok || out.error) throw new Error(out.error || p.statusText);
+      return { ...out, seconds: (performance.now() - start) / 1000 };
+    }
+  } finally { clearInterval(tick); }
+}
+
+function bars(out) {
+  return `<div class="bars">${Object.entries(out.probs).sort((a, b) => b[1] - a[1]).map(([label, p]) =>
+    `<div class="bar ${label === out.top ? "top" : ""}"><i style="width:${(p * 100).toFixed(1)}%"></i><span>${esc(label)}</span><span>${(p * 100).toFixed(1)}%</span></div>`).join("")}</div>`;
+}
+
+$("sample").onclick = async () => {
+  try {
+    const s = await sample(jev);
+    for (const [f, v] of Object.entries(s)) {
+      if (f === "text") { $("in-text").value = values.text = v; } else await setMedia(f, v);
+    }
+  } catch (e) { $("status").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+};
+
+$("run").onclick = async () => {
+  const missing = fields(jev).filter(f => !values[f]);
+  if (missing.length) { $("status").innerHTML = `<span class="error">missing: ${missing.join(", ")}</span>`; return; }
+  $("run").disabled = true; $("result").hidden = true;
+  try {
+    const out = await classify(jev, values, s => $("status").textContent = `running ${s.toFixed(1)} s${s > 25 ? " (a cold start loads the weights first)" : ""}`);
+    $("status").textContent = `done in ${out.seconds.toFixed(1)} s`;
+    $("result").innerHTML = `<label>${jev} → Probs</label>${bars(out)}`; $("result").hidden = false;
+  } catch (e) { $("status").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+  $("run").disabled = false;
+};
+
+$("all").onclick = async () => {
+  $("all").disabled = true; $("table").hidden = false;
+  const tbody = $("table").querySelector("tbody"); tbody.innerHTML = "";
+  await Promise.all(JEVS.map(async j => {
+    const tr = tbody.insertRow(); tr.innerHTML = `<td>${j}</td><td class="status">queued</td><td class="num"></td><td class="num"></td>`;
+    try {
+      const s = await sample(j), body = {};
+      for (const [f, v] of Object.entries(s)) body[f] = f === "text" ? v : await b64(v);
+      const out = await classify(j, body, t => tr.cells[3].textContent = `${t.toFixed(0)} s`);
+      tr.cells[1].textContent = out.top; tr.cells[1].className = "";
+      tr.cells[2].textContent = (out.probs[out.top] * 100).toFixed(1) + "%";
+      tr.cells[3].textContent = `${out.seconds.toFixed(1)} s`;
+    } catch (e) { tr.cells[1].innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+  }));
+  $("all").disabled = false;
+};
+
+renderJevs(); select(jev);
+</script>
+</body>
+</html>
