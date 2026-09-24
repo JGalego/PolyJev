@@ -67,12 +67,12 @@ A local run downloads the weights once into `~/.cache/polyjev` (override with `J
 ### Gateway and demo app
 
 ```bash
-just gateway                # HTTP API + router; prints the URL and saves a bearer token to .token
+just gateway                # API Gateway + router + CloudFront/S3, publishes the demo app, saves a token to .token
+just demo                   # prints the demo app's CloudFront link, with the token in the URL fragment
 just call text-image        # one Jev's sample through the API with curl
-just demo                   # serves demo/ on http://localhost:8000 and prints a link with the URL and token
 ```
 
-The demo app has a card per Jev. For each one you can upload your own inputs or load the bundled sample, and it shows the probability of every option. **Run all 15** classifies every sample in parallel. `just destroy-gateway` empties the job bucket and deletes the stack.
+The demo app has a card per Jev. For each one you can upload your own inputs or load the bundled sample, and it shows the probability of every option. **Run all 15** classifies every sample in parallel. `just destroy-gateway` empties both buckets and deletes the stack.
 
 ## Architecture (AWS)
 
@@ -81,7 +81,9 @@ flowchart LR
     dev["Developer<br/>just deploy JEV"] -- "sam build (arm64) + push" --> ecr[("Amazon ECR<br/>image with baked-in weights")]
     ecr -- "sam deploy" --> fn["AWS Lambda container<br/>polyjev-JEV (×15)<br/>handler → Jev → Probs"]
     dev -. "just test<br/>aws lambda invoke" .-> fn
-    app["Demo app / curl"] -- "POST /jevs/JEV<br/>GET /jobs/ID" --> api["API Gateway<br/>HTTP API"]
+    user["Browser / curl"] --> cdn["Amazon CloudFront"]
+    cdn -- "/, /JEV/sample.*" --> site[("S3 site bucket<br/>demo app + samples")]
+    cdn -- "POST /jevs/JEV<br/>GET /jobs/ID" --> api["Amazon API Gateway<br/>HTTP API"]
     api --> router["Lambda<br/>polyjev-gateway"]
     router -- "request / Probs" --> s3[("S3 job bucket<br/>expires in 1 day")]
     router -- "async self-invoke,<br/>then invoke" --> fn
@@ -89,7 +91,7 @@ flowchart LR
     router -- "logs" --> cw
 ```
 
-Each Jev stack is one container-image function with no public URL of its own. You can call it directly with `lambda:InvokeFunction`, or through the optional gateway stack in `gateway/`, which puts one HTTP API in front of all 15. The gateway's integrations time out after 30 s, but a Jev can take longer, and minutes on a cold start. So `POST /jevs/{jev}` stores the request in S3, returns `202 {"job": id}`, and the router invokes itself asynchronously to call `polyjev-{jev}`, waiting up to 900 s. `GET /jobs/{id}` returns `202` while the job runs, then the Probs or `{"error": …}`. Every route requires `Authorization: Bearer <token>`, and the stage is throttled to 5 requests per second. Jevs that aren't deployed return an error when polled rather than a crash. Requests are JSON: `text` is a string, and `image`, `audio`, and `video` are base64. The response is `{"top": label, "probs": {label: p}}`. Video is sampled as `FRAMES = 4` evenly spaced frames. In the combinations that include audio, the audio comes from the clip's own soundtrack. Both are extracted with ffmpeg and fed through the model's image and audio paths.
+Each Jev stack is one container-image function with no public URL of its own. You can call it directly with `lambda:InvokeFunction`, or through the optional gateway stack in `gateway/`. That stack is serverless too: an Amazon API Gateway HTTP API in front of all 15 functions, and a CloudFront distribution that serves the demo app from a private S3 bucket and forwards `/jevs/*` and `/jobs/*` to the API, so the app and the API share one HTTPS origin. API Gateway's integrations time out after 30 s, but a Jev can take longer, and minutes on a cold start. So `POST /jevs/{jev}` stores the request in S3, returns `202 {"job": id}`, and the router invokes itself asynchronously to call `polyjev-{jev}`, waiting up to 900 s. `GET /jobs/{id}` returns `202` while the job runs, then the Probs or `{"error": …}`. Every API route requires an `x-polyjev-token` header, and the stage is throttled to 5 requests per second. Jevs that aren't deployed return an error when polled rather than a crash. Requests are JSON: `text` is a string, and `image`, `audio`, and `video` are base64. The response is `{"top": label, "probs": {label: p}}`. Video is sampled as `FRAMES = 4` evenly spaced frames. In the combinations that include audio, the audio comes from the clip's own soundtrack. Both are extracted with ffmpeg and fed through the model's image and audio paths.
 
 **Cold starts.** Weights are downloaded while the image is built, so a cold start downloads nothing. The model is loaded on the first invoke rather than in the 10-second init phase: Lambda streams the image from ECR, and the GGUF weights are memory-mapped from it. That is why the timeout is the full 900 s. Warm invocations reuse the loaded model.
 
