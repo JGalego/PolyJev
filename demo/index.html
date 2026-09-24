@@ -53,8 +53,8 @@
   </header>
 
   <section class="card row">
-    <div class="grow"><label for="api">API URL</label><input id="api" type="text" placeholder="https://….execute-api.….amazonaws.com"></div>
-    <div class="grow"><label for="token">Token</label><input id="token" type="password" placeholder="from .token"></div>
+    <div class="grow"><label for="api">API URL</label><input id="api" type="text" placeholder="https://….cloudfront.net"></div>
+    <div class="grow"><label for="token">Token</label><input id="token" type="password" placeholder="x-polyjev-token (from .token)"></div>
   </section>
 
   <section class="card">
@@ -96,7 +96,9 @@ const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch 
                 set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 
 const params = new URLSearchParams(location.search), hash = new URLSearchParams(location.hash.slice(1));
-$("api").value = params.get("api") || store.get("api");
+// Served by CloudFront, the API is on this same origin; opened locally, it comes from ?api= or the last value used.
+const local = ["localhost", "127.0.0.1", ""].includes(location.hostname);
+$("api").value = params.get("api") || (local ? store.get("api") : location.origin);
 $("token").value = hash.get("token") || store.get("token");
 for (const id of ["api", "token"]) $(id).addEventListener("change", e => store.set(id, e.target.value.trim()));
 if (hash.has("token")) { store.set("token", hash.get("token")); history.replaceState(null, "", location.pathname + location.search); }

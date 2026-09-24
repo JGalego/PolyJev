@@ -42,31 +42,34 @@ destroy jev:
 check:
     uv run pyright
 
-# Deploy the HTTP API gateway; the bearer token is $POLYJEV_TOKEN, else .token, else a new one saved to .token
+# Deploy API Gateway + router + CloudFront/S3 and publish the demo app (token: $POLYJEV_TOKEN, else .token, else new)
 gateway:
     @test -n "${POLYJEV_TOKEN:-}" -o -s .token || python3 -c 'import secrets; print(secrets.token_urlsafe(24))' > .token
     sam deploy -t gateway/template.yaml --stack-name polyjev-gateway --resolve-s3 --parameter-overrides Token={{token}}
-    @echo "API: $(just url)"
+    aws s3 cp demo/index.html "s3://$(just output SiteBucket)/index.html"
+    aws s3 sync . "s3://$(just output SiteBucket)" --exclude '*' --include '*/sample.*' --include '*/jev.py' --exclude 'core/*' --exclude '.*'
+    aws cloudfront create-invalidation --distribution-id "$(just output Distribution)" --paths '/*' > /dev/null
+    @echo "Demo app and API: $(just output Site)"
 
-# Print the gateway's URL
-url:
-    @aws cloudformation describe-stacks --stack-name polyjev-gateway --query "Stacks[0].Outputs[?OutputKey=='Url'].OutputValue" --output text
+# Print an output of the gateway stack: Site, Url, Distribution, SiteBucket, or JobBucket
+output name="Site":
+    @aws cloudformation describe-stacks --stack-name polyjev-gateway --query "Stacks[0].Outputs[?OutputKey=='{{name}}'].OutputValue" --output text
 
-# Empty the job bucket and delete the gateway stack
+# Empty both buckets and delete the gateway stack
 destroy-gateway:
-    aws s3 rm "s3://$(aws cloudformation describe-stacks --stack-name polyjev-gateway --query "Stacks[0].Outputs[?OutputKey=='Bucket'].OutputValue" --output text)" --recursive
+    aws s3 rm "s3://$(just output JobBucket)" --recursive
+    aws s3 rm "s3://$(just output SiteBucket)" --recursive
     sam delete --stack-name polyjev-gateway --no-prompts
 
 # Classify a Jev's sample through the gateway with curl
 call jev:
     #!/usr/bin/env bash
     set -euo pipefail
-    api=$(just url); auth="x-polyjev-token: {{token}}"
+    api=$(just output Site); auth="x-polyjev-token: {{token}}"
     job=$(uv run python -m core.payload {{jev}} | curl -sf -H "$auth" -H 'content-type: application/json' --data-binary @- "$api/jevs/{{jev}}" | python3 -c 'import json, sys; print(json.load(sys.stdin)["job"])')
     while out=$(curl -s -w '\n%{http_code}' -H "$auth" "$api/jobs/$job") && [ "${out##*$'\n'}" = 202 ]; do sleep 2; done
     echo "${out%$'\n'*}" | python3 -m json.tool
 
-# Serve the demo app for the deployed gateway on http://localhost:<port>
-demo port="8000":
-    @echo "open http://localhost:{{port}}/demo/?api=$(just url)#token={{token}}"
-    python3 -m http.server {{port}} --bind 127.0.0.1
+# Print the demo app's link, with the token in the URL fragment (never sent to the server)
+demo:
+    @echo "$(just output Site)/#token={{token}}"

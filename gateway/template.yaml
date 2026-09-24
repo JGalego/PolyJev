@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: polyjev gateway - one HTTP API in front of every deployed polyjev-<jev> Lambda
+Description: polyjev gateway - CloudFront serves the demo app from S3 and routes /jevs, /jobs to an API Gateway HTTP API in front of every polyjev-<jev> Lambda
 
 Parameters:
   Token:
@@ -71,8 +71,77 @@ Resources:
       LogGroupName: /aws/lambda/polyjev-gateway
       RetentionInDays: 14
 
+  # The demo app: a private bucket read only by CloudFront, which also fronts the API on the same origin.
+  Site:
+    Type: AWS::S3::Bucket
+
+  SitePolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Site
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {Service: cloudfront.amazonaws.com}
+            Action: s3:GetObject
+            Resource: !Sub ${Site.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Cdn}
+
+  SiteAccess:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-site
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  Cdn:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: polyjev demo app and API
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: site
+            DomainName: !GetAtt Site.RegionalDomainName
+            OriginAccessControlId: !Ref SiteAccess
+            S3OriginConfig: {OriginAccessIdentity: ""}
+          - Id: api
+            DomainName: !Sub ${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+            CustomOriginConfig: {OriginProtocolPolicy: https-only}
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+        CacheBehaviors:
+          - PathPattern: /jevs/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+          - PathPattern: /jobs/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+
 Outputs:
+  Site:
+    Description: Demo app; the API is served on the same origin under /jevs and /jobs
+    Value: !Sub https://${Cdn.DomainName}
   Url:
+    Description: The API Gateway endpoint itself
     Value: !Sub https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}
-  Bucket:
+  Distribution:
+    Value: !Ref Cdn
+  SiteBucket:
+    Value: !Ref Site
+  JobBucket:
     Value: !Ref Jobs
