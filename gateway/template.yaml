@@ -74,3 +74,5 @@ Resources:
 Outputs:
   Url:
     Value: !Sub https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  Bucket:
+    Value: !Ref Jobs

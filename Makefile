@@ -1,10 +1,6 @@
 # make deploy|test|destroy JEV=<folder>    make local [JEV=<folder>]    make check
 JEVS := $(filter-out core,$(patsubst %/jev.py,%,$(wildcard */jev.py)))
 STACK = polyjev-$(JEV)
-PAYLOAD = import base64, json, pathlib, sys; \
-  kinds = {".txt": "text", ".png": "image", ".wav": "audio", ".mp4": "video"}; \
-  print(json.dumps({kinds[p.suffix]: p.read_text() if p.suffix == ".txt" else base64.b64encode(p.read_bytes()).decode() \
-                    for p in pathlib.Path(sys.argv[1]).glob("sample.*")}))
 
 .PHONY: deploy test local destroy check jev
 
@@ -14,7 +10,7 @@ deploy: jev  ## build the arm64 image, push it to ECR, deploy the stack
 
 test: jev  ## invoke the deployed Lambda with sample.* and pretty-print Probs
 	@mkdir -p .aws-sam
-	@uv run python -c '$(PAYLOAD)' $(JEV) > .aws-sam/payload.json
+	@uv run python -m core.payload $(JEV) > .aws-sam/payload.json
 	@aws lambda invoke --function-name $(STACK) --payload fileb://.aws-sam/payload.json --cli-read-timeout 900 .aws-sam/response.json > /dev/null
 	@uv run python -m json.tool .aws-sam/response.json
 
