@@ -33,8 +33,8 @@ def respond(status: int, body: object) -> dict[str, Any]:
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
     if "job" in event:  # our own async invocation
         return work(event["job"], event["jev"])
-    if not hmac.compare_digest(event.get("headers", {}).get("authorization", ""), f"Bearer {TOKEN}"):
-        return respond(401, {"error": "missing or wrong bearer token"})
+    if not hmac.compare_digest(event.get("headers", {}).get("x-polyjev-token", ""), TOKEN):
+        return respond(401, {"error": "missing or wrong x-polyjev-token header"})
     params: dict[str, str] = event.get("pathParameters") or {}
     if "jev" in params:
         return submit(params["jev"], event.get("body") or "", event.get("isBase64Encoded", False), context.function_name)

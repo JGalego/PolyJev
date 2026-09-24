@@ -54,7 +54,7 @@
 
   <section class="card row">
     <div class="grow"><label for="api">API URL</label><input id="api" type="text" placeholder="https://….execute-api.….amazonaws.com"></div>
-    <div class="grow"><label for="token">Bearer token</label><input id="token" type="password" placeholder="from .token"></div>
+    <div class="grow"><label for="token">Token</label><input id="token" type="password" placeholder="from .token"></div>
   </section>
 
   <section class="card">
@@ -166,7 +166,7 @@ async function sample(j) {
 const b64 = blob => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.readAsDataURL(blob); });
 
 async function classify(j, body, onTick) {
-  const api = $("api").value.trim().replace(/\/$/, ""), headers = { authorization: `Bearer ${$("token").value.trim()}` };
+  const api = $("api").value.trim().replace(/\/$/, ""), headers = { "x-polyjev-token": $("token").value.trim() };
   if (!api) throw new Error("set the API URL first");
   const start = performance.now(), tick = setInterval(() => onTick((performance.now() - start) / 1000), 250);
   try {

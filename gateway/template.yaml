@@ -7,7 +7,7 @@ Parameters:
     Type: String
     NoEcho: true
     MinLength: 16
-    Description: Bearer token that callers must send in the Authorization header
+    Description: Shared secret that callers send in the x-polyjev-token header
 
 Resources:
   Api:
@@ -16,7 +16,7 @@ Resources:
       CorsConfiguration:
         AllowOrigins: ["*"]
         AllowMethods: [GET, POST]
-        AllowHeaders: [authorization, content-type]
+        AllowHeaders: [x-polyjev-token, content-type]
       DefaultRouteSettings:
         ThrottlingBurstLimit: 10
         ThrottlingRateLimit: 5

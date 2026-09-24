@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 os.environ.update(BUCKET="bucket", TOKEN="secret-token-123456", AWS_DEFAULT_REGION="us-east-1")
 import router  # noqa: E402
 
-AUTH = {"authorization": "Bearer secret-token-123456"}
+AUTH = {"x-polyjev-token": "secret-token-123456"}
 
 
 class Context:
@@ -70,6 +70,6 @@ def test_jev_error_is_reported() -> None:
 
 
 def test_rejects_bad_token_unknown_jev_and_job() -> None:
-    assert call("POST /jevs/text", "{}", {"authorization": "Bearer nope"})[0] == 401
+    assert call("POST /jevs/text", "{}", {"x-polyjev-token": "nope"})[0] == 401
     assert call("POST /jevs/smell", "{}")[0] == 404
     assert call("GET /jobs/123")[0] == 404

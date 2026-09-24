@@ -61,7 +61,7 @@ destroy-gateway:
 call jev:
     #!/usr/bin/env bash
     set -euo pipefail
-    api=$(just url); auth="authorization: Bearer {{token}}"
+    api=$(just url); auth="x-polyjev-token: {{token}}"
     job=$(uv run python -m core.payload {{jev}} | curl -sf -H "$auth" -H 'content-type: application/json' --data-binary @- "$api/jevs/{{jev}}" | python3 -c 'import json, sys; print(json.load(sys.stdin)["job"])')
     while out=$(curl -s -w '\n%{http_code}' -H "$auth" "$api/jobs/$job") && [ "${out##*$'\n'}" = 202 ]; do sleep 2; done
     echo "${out%$'\n'*}" | python3 -m json.tool
