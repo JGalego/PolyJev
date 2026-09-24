@@ -1,0 +1,13 @@
+version = 0.1
+
+[default.global.parameters]
+beta_features = false
+
+[default.build.parameters]
+cached = false
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
+resolve_image_repos = true

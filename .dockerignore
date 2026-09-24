@@ -1,0 +1,6 @@
+*
+!pyproject.toml
+!uv.lock
+!core/jev.py
+!*/jev.py
+!*/handler.py

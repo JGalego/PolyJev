@@ -1,0 +1,1 @@
+Bug: clicking 'Pay now' shows 'Payment declined' even with a valid card.

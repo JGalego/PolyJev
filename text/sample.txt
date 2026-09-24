@@ -1,0 +1,7 @@
+From: IT Service Desk <helpdesk@micros0ft-support.co>
+Subject: Action required: mailbox storage full
+
+Your mailbox has exceeded its storage limit and incoming mail will be suspended within 24 hours.
+To keep your account active, confirm your password here: http://micros0ft-support.co/verify
+
+IT Service Desk

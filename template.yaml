@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: polyjev - one Jev as an arm64 container-image Lambda (no API, invoke only)
+
+Parameters:
+  Jev:
+    Type: String
+    Description: Folder name of the Jev to deploy
+    AllowedValues: [text, image, audio, video, text-image, text-audio, text-video, image-audio, image-video, audio-video,
+                    text-image-audio, text-image-video, text-audio-video, image-audio-video, text-image-audio-video]
+
+Mappings:
+  # Peak RSS plus headroom: ~0.9 GB SmolVLM2-500M, ~2.4 GB Qwen3-1.7B, ~4.8 GB Gemma 4 E2B.
+  # Lambda gives CPU in proportion to memory, so extra memory also means faster inference.
+  Memory:
+    text: {MB: 4096}
+    image: {MB: 3008}
+    audio: {MB: 8192}
+    video: {MB: 3008}
+    text-image: {MB: 3008}
+    text-audio: {MB: 8192}
+    text-video: {MB: 8192}
+    image-audio: {MB: 8192}
+    image-video: {MB: 3008}
+    audio-video: {MB: 8192}
+    text-image-audio: {MB: 8192}
+    text-image-video: {MB: 8192}
+    text-audio-video: {MB: 8192}
+    image-audio-video: {MB: 8192}
+    text-image-audio-video: {MB: 8192}
+
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub polyjev-${Jev}
+      PackageType: Image
+      Architectures: [arm64]
+      MemorySize: !FindInMap [Memory, !Ref Jev, MB]
+      Timeout: 900 # first call after a cold start loads GBs of weights from the image
+      LoggingConfig:
+        LogGroup: !Ref Logs
+    Metadata:
+      DockerContext: .
+      Dockerfile: !Sub ${Jev}/Dockerfile
+      DockerTag: !Ref Jev
+
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/polyjev-${Jev}
+      RetentionInDays: 14
+
+Outputs:
+  FunctionName:
+    Value: !Ref Function

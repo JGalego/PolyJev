@@ -1,0 +1,30 @@
+[project]
+name = "polyjev"
+version = "0.1.0"
+description = "Typed answers from any modality, one forward pass."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = ["llama-cpp-python>=0.3.35", "numpy>=2", "pydantic>=2"]
+
+[dependency-groups]
+dev = ["pyright>=1.1.400", "pytest>=8"]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "llama-cpp"
+url = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+llama-cpp-python = { index = "llama-cpp" }
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+exclude = [".venv"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,1 @@
+Alert: checkout-api error rate above 40% for 5 minutes.
