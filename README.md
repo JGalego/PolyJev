@@ -32,7 +32,7 @@ probs.top                                     # Category.MEALS
 
 ### Prerequisites
 
-- [uv](https://docs.astral.sh/uv/)
+- [uv](https://docs.astral.sh/uv/) and [just](https://just.systems/) (`uv tool install rust-just`). A Makefile covers the per-Jev targets for anyone without just.
 - [Docker](https://docs.docker.com/get-docker/) with arm64 builds. This works natively on Apple Silicon and Graviton. On x86 Linux, install QEMU first: `docker run --privileged --rm tonistiigi/binfmt --install arm64`
 - [AWS CLI](https://aws.amazon.com/cli/) and [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 - AWS credentials and a default region (`aws configure`, or `AWS_PROFILE` / `AWS_REGION`)
@@ -47,33 +47,49 @@ uv sync
 ### Deploy
 
 ```bash
-make deploy JEV=text-image
+just deploy text-image      # or: make deploy JEV=text-image
 ```
 
-This builds the arm64 image with the weights baked in, pushes it to a SAM-managed ECR repository (`--resolve-image-repos`), and deploys the `polyjev-text-image` stack without prompting. `make destroy JEV=text-image` removes both.
+This builds the arm64 image with the weights baked in, pushes it to a SAM-managed ECR repository (`--resolve-image-repos`), and deploys the `polyjev-text-image` stack without prompting. `just destroy text-image` removes both. `just deploy-all` deploys all 15 Jevs and then the gateway.
 
 ### Test
 
 ```bash
-make local JEV=text-image   # pytest on this machine: probabilities sum to 1 and the top label is right
-make local                  # the same for all 15 Jevs
-make test JEV=text-image    # invokes the deployed Lambda with sample.* and pretty-prints Probs
-make check                  # pyright --strict, also enforced in CI
+just local text-image       # pytest on this machine: probabilities sum to 1 and the top label is right
+just local                  # the same for all 15 Jevs, plus the gateway's router tests
+just invoke text-image      # sam local invoke: the real Lambda image on sample.*
+just test text-image        # invokes the deployed Lambda with sample.* and pretty-prints Probs
+just check                  # pyright --strict, also enforced in CI
 ```
 
-A local run downloads the weights once into `~/.cache/polyjev` (override with `JEV_WEIGHTS`).
+A local run downloads the weights once into `~/.cache/polyjev` (override with `JEV_WEIGHTS`). `just invoke` runs the same arm64 image that Lambda runs. That's native and quick on Apple Silicon or Graviton, but on x86 it runs under QEMU and can take minutes per call.
+
+### Gateway and demo app
+
+```bash
+just gateway                # HTTP API + router; prints the URL and saves a bearer token to .token
+just call text-image        # one Jev's sample through the API with curl
+just demo                   # serves demo/ on http://localhost:8000 and prints a link with the URL and token
+```
+
+The demo app has a card per Jev. For each one you can upload your own inputs or load the bundled sample, and it shows the probability of every option. **Run all 15** classifies every sample in parallel. `just destroy-gateway` empties the job bucket and deletes the stack.
 
 ## Architecture (AWS)
 
 ```mermaid
 flowchart LR
-    dev["Developer<br/>make deploy JEV=…"] -- "sam build (arm64) + push" --> ecr[("Amazon ECR<br/>image with baked-in weights")]
-    ecr -- "sam deploy" --> fn["AWS Lambda container<br/>arm64 / Graviton<br/>handler → Jev → Probs"]
-    dev -. "make test<br/>aws lambda invoke" .-> fn
-    fn -- "logs" --> cw["CloudWatch Logs<br/>/aws/lambda/polyjev-JEV"]
+    dev["Developer<br/>just deploy JEV"] -- "sam build (arm64) + push" --> ecr[("Amazon ECR<br/>image with baked-in weights")]
+    ecr -- "sam deploy" --> fn["AWS Lambda container<br/>polyjev-JEV (×15)<br/>handler → Jev → Probs"]
+    dev -. "just test<br/>aws lambda invoke" .-> fn
+    app["Demo app / curl"] -- "POST /jevs/JEV<br/>GET /jobs/ID" --> api["API Gateway<br/>HTTP API"]
+    api --> router["Lambda<br/>polyjev-gateway"]
+    router -- "request / Probs" --> s3[("S3 job bucket<br/>expires in 1 day")]
+    router -- "async self-invoke,<br/>then invoke" --> fn
+    fn -- "logs" --> cw["CloudWatch Logs"]
+    router -- "logs" --> cw
 ```
 
-Each stack is one container-image function with no API Gateway and no public URL, so the only way to call it is `lambda:InvokeFunction`. Requests are JSON: `text` is a string, and `image`, `audio`, and `video` are base64. The response is `{"top": label, "probs": {label: p}}`. Video is sampled as `FRAMES = 4` evenly spaced frames. In the combinations that include audio, the audio comes from the clip's own soundtrack. Both are extracted with ffmpeg and fed through the model's image and audio paths.
+Each Jev stack is one container-image function with no public URL of its own. You can call it directly with `lambda:InvokeFunction`, or through the optional gateway stack in `gateway/`, which puts one HTTP API in front of all 15. The gateway's integrations time out after 30 s, but a Jev can take longer, and minutes on a cold start. So `POST /jevs/{jev}` stores the request in S3, returns `202 {"job": id}`, and the router invokes itself asynchronously to call `polyjev-{jev}`, waiting up to 900 s. `GET /jobs/{id}` returns `202` while the job runs, then the Probs or `{"error": …}`. Every route requires `Authorization: Bearer <token>`, and the stage is throttled to 5 requests per second. Jevs that aren't deployed return an error when polled rather than a crash. Requests are JSON: `text` is a string, and `image`, `audio`, and `video` are base64. The response is `{"top": label, "probs": {label: p}}`. Video is sampled as `FRAMES = 4` evenly spaced frames. In the combinations that include audio, the audio comes from the clip's own soundtrack. Both are extracted with ffmpeg and fed through the model's image and audio paths.
 
 **Cold starts.** Weights are downloaded while the image is built, so a cold start downloads nothing. The model is loaded on the first invoke rather than in the 10-second init phase: Lambda streams the image from ECR, and the GGUF weights are memory-mapped from it. That is why the timeout is the full 900 s. Warm invocations reuse the loaded model.
 
