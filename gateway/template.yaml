@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: polyjev gateway - one HTTP API in front of every deployed polyjev-<jev> Lambda
+
+Parameters:
+  Token:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: Bearer token that callers must send in the Authorization header
+
+Resources:
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST]
+        AllowHeaders: [authorization, content-type]
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 5
+
+  Jobs:
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules: [{Status: Enabled, ExpirationInDays: 1}]
+
+  Router:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: polyjev-gateway
+      CodeUri: .
+      Handler: router.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      MemorySize: 256
+      Timeout: 900 # the async half waits for the Jev, cold start included
+      Environment:
+        Variables:
+          BUCKET: !Ref Jobs
+          TOKEN: !Ref Token
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0 # a failed job is written to S3, never re-run
+      Policies:
+        - S3CrudPolicy: {BucketName: !Ref Jobs}
+        - Statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction # the Jevs, and itself for the async half
+              Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:polyjev-*
+      LoggingConfig:
+        LogGroup: !Ref Logs
+      Events:
+        Submit:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: POST
+            Path: /jevs/{jev}
+        Poll:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /jobs/{job}
+
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/polyjev-gateway
+      RetentionInDays: 14
+
+Outputs:
+  Url:
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}
