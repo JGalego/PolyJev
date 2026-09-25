@@ -32,10 +32,10 @@ probs.top                                     # Category.MEALS
 
 ### Prerequisites
 
-- [uv](https://docs.astral.sh/uv/) and [just](https://just.systems/) (`uv tool install rust-just`). A Makefile covers the per-Jev targets for anyone without just.
+- [uv](https://docs.astral.sh/uv/)
 - [Docker](https://docs.docker.com/get-docker/) with arm64 builds. This works natively on Apple Silicon and Graviton. On x86 Linux, install QEMU first: `docker run --privileged --rm tonistiigi/binfmt --install arm64`
-- [AWS CLI](https://aws.amazon.com/cli/) and [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
-- AWS credentials and a default region (`aws configure`, or `AWS_PROFILE` / `AWS_REGION`)
+- [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (2.32 or later, for `aws login`) and [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
+- AWS credentials: run `aws login`. It signs you in through the browser with your AWS console credentials, asks for a default region the first time, and stores short-lived credentials instead of long-lived access keys.
 - `ffmpeg` on your `PATH` to run the video Jevs locally (the images ship their own)
 
 ### Build / install
@@ -47,40 +47,50 @@ uv sync
 ### Deploy
 
 ```bash
-just deploy text-image      # or: make deploy JEV=text-image
+make deploy JEV=text-image
 ```
 
-This builds the arm64 image with the weights baked in, pushes it to a SAM-managed ECR repository (`--resolve-image-repos`), and deploys the `polyjev-text-image` stack without prompting. `just destroy text-image` removes both. `just deploy-all` deploys all 15 Jevs and then the gateway.
+This builds the arm64 image with the weights baked in, pushes it to a SAM-managed ECR repository (`--resolve-image-repos`), and deploys the `polyjev-text-image` stack without prompting. `make destroy JEV=text-image` removes both.
 
 ### Test
 
 ```bash
-just local text-image       # pytest on this machine: probabilities sum to 1 and the top label is right
-just local                  # the same for all 15 Jevs, plus the gateway's router tests
-just invoke text-image      # sam local invoke: the real Lambda image on sample.*
-just test text-image        # invokes the deployed Lambda with sample.* and pretty-prints Probs
-just check                  # pyright --strict, also enforced in CI
+make local JEV=text-image   # pytest on this machine: probabilities sum to 1 and the top label is right
+make local                  # the same for all 15 Jevs
+make test JEV=text-image    # invokes the deployed Lambda with sample.* and pretty-prints Probs
+make check                  # pyright --strict, also enforced in CI
 ```
 
-A local run downloads the weights once into `~/.cache/polyjev` (override with `JEV_WEIGHTS`). `just invoke` runs the same arm64 image that Lambda runs. That's native and quick on Apple Silicon or Graviton, but on x86 it runs under QEMU and can take minutes per call.
+A local run downloads the weights once into `~/.cache/polyjev` (override with `JEV_WEIGHTS`). The gateway and the demo app are deployed with just; see [Just commands](#just-commands).
 
-### Gateway and demo app
+## Just commands
 
-```bash
-just gateway                # API Gateway + router + CloudFront/S3, publishes the demo app, saves a token to .token
-just demo                   # prints the demo app's CloudFront link, with the token in the URL fragment
-just call text-image        # one Jev's sample through the API with curl
-```
+The [justfile](justfile) covers everything above, plus the gateway and the demo app. Install just with `uv tool install rust-just`, then run `just` to list the commands. `<jev>` is a folder name such as `text-image`.
 
-The demo app has a card per Jev. For each one you can upload your own inputs or load the bundled sample, and it shows the probability of every option. **Run all 15** classifies every sample in parallel. `just destroy-gateway` empties both buckets and deletes the stack.
+| Command | What it does |
+| --- | --- |
+| `just login` | `aws login`: sign in to AWS with your console credentials |
+| `just test [<jev>]` | Run the tests on this machine: one Jev, or every Jev plus the gateway |
+| `just check` | Type-check everything with pyright --strict |
+| `just run <jev>` | Build a Jev's Lambda image and run it on this machine (`sam local invoke`) with its sample |
+| `just deploy <jev>` | Deploy one Jev to AWS |
+| `just deploy gateway` | Deploy API Gateway, the router, and the CloudFront-hosted demo app |
+| `just deploy all` | Deploy all 15 Jevs, then the gateway |
+| `just invoke <jev>` | Send a Jev's sample to its deployed Lambda and print the Probs |
+| `just demo` | Print the demo app's link, with the access token in the URL fragment |
+| `just destroy <jev>` / `gateway` / `all` | Delete what `deploy` created |
+
+`just run` uses the same arm64 image that Lambda runs. That's native and quick on Apple Silicon or Graviton, but on x86 it runs under QEMU and can take minutes per call.
+
+The demo app has a card per Jev. For each one you can upload your own inputs or load the bundled sample, and it shows the probability of every option. **Run all 15** classifies every sample in parallel.
 
 ## Architecture (AWS)
 
 ```mermaid
 flowchart LR
-    dev["Developer<br/>just deploy JEV"] -- "sam build (arm64) + push" --> ecr[("Amazon ECR<br/>image with baked-in weights")]
+    dev["Developer<br/>make deploy JEV=…"] -- "sam build (arm64) + push" --> ecr[("Amazon ECR<br/>image with baked-in weights")]
     ecr -- "sam deploy" --> fn["AWS Lambda container<br/>polyjev-JEV (×15)<br/>handler → Jev → Probs"]
-    dev -. "just test<br/>aws lambda invoke" .-> fn
+    dev -. "make test<br/>aws lambda invoke" .-> fn
     user["Browser / curl"] --> cdn["Amazon CloudFront"]
     cdn -- "/, /JEV/sample.*" --> site[("S3 site bucket<br/>demo app + samples")]
     cdn -- "POST /jevs/JEV<br/>GET /jobs/ID" --> api["Amazon API Gateway<br/>HTTP API"]
