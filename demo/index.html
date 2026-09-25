@@ -44,10 +44,6 @@
   .bar.top { font-weight: 700; }
   .status { color: var(--muted); font-variant-numeric: tabular-nums; }
   .error { color: var(--err); white-space: pre-wrap; }
-  table { width: 100%; border-collapse: collapse; }
-  td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font-size: 12px; color: var(--muted); text-transform: uppercase; }
-  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -80,14 +76,6 @@
   </section>
 
   <section class="card" id="result" hidden></section>
-
-  <section class="card">
-    <div class="row" style="justify-content:space-between">
-      <div><strong>Showcase</strong> <span class="status">run every Jev on its bundled sample, in parallel</span></div>
-      <button id="all">Run all</button>
-    </div>
-    <table id="table" hidden><thead><tr><th>Jev</th><th>Top answer</th><th>p</th><th>Time</th></tr></thead><tbody></tbody></table>
-  </section>
 </main>
 
 <script>
@@ -127,8 +115,6 @@ async function refresh() {
       if (r.ok) up = (await r.json()).jevs;
     } catch {}
   }
-  const n = JEVS.filter(deployed).length;
-  $("all").textContent = `Run all ${n}`; $("all").disabled = n === 0;
   renderJevs(); showDeployed();
 }
 
@@ -233,8 +219,6 @@ async function sample(j) {
   return out;
 }
 
-const b64 = blob => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.readAsDataURL(blob); });
-
 async function classify(j, body, onTick) {
   const api = $("api").value.trim().replace(/\/$/, ""), headers = { "x-polyjev-token": $("token").value.trim() };
   if (!api) throw new Error("set the API URL first");
@@ -287,27 +271,6 @@ $("run").onclick = async () => {
     $("status").innerHTML = e instanceof NotDeployed ? esc(e.message) : `<span class="error">${esc(e.message)}</span>`;
   }
   $("run").disabled = !deployed(jev);
-};
-
-$("all").onclick = async () => {
-  $("all").disabled = true; $("table").hidden = false;
-  const tbody = $("table").querySelector("tbody"); tbody.innerHTML = "";
-  await Promise.all(JEVS.map(async j => {
-    const tr = tbody.insertRow(); tr.innerHTML = `<td>${j}</td><td class="status">queued</td><td class="num"></td><td class="num"></td>`;
-    if (!deployed(j)) { tr.cells[1].textContent = "not deployed"; return; }
-    try {
-      const s = await sample(j), body = {};
-      for (const [f, v] of Object.entries(s)) body[f] = f === "text" ? v : await b64(v);
-      const out = await classify(j, body, t => { tr.cells[1].textContent = "running"; tr.cells[3].textContent = `${t.toFixed(0)} s`; });
-      tr.cells[1].textContent = out.top; tr.cells[1].className = "";
-      tr.cells[2].textContent = (out.probs[out.top] * 100).toFixed(1) + "%";
-      tr.cells[3].textContent = `${out.seconds.toFixed(1)} s`;
-    } catch (e) {
-      if (e instanceof NotDeployed) { tr.cells[1].textContent = "not deployed"; tr.cells[3].textContent = ""; }
-      else tr.cells[1].innerHTML = `<span class="error">${esc(e.message)}</span>`;
-    }
-  }));
-  $("all").disabled = !JEVS.some(deployed);
 };
 
 renderJevs(); select(jev); refresh();

@@ -35,7 +35,7 @@ probs.top                                     # Category.MEALS
 
 - ⚡ [uv](https://docs.astral.sh/uv/)
 - 🐋 [Docker](https://docs.docker.com/get-docker/) with the [buildx](https://docs.docker.com/build/concepts/overview/#buildx) plugin (images are built with BuildKit) and arm64 builds. This works natively on Apple Silicon and Graviton. On x86 Linux, install QEMU first: `docker run --privileged --rm tonistiigi/binfmt --install arm64`
-- ☁️ [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (2.32 or later, for `aws login`) and a recent [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) with `--use-buildkit` (tested with 1.166). Older releases such as 1.146 can't talk to Docker Engine 29 and fail with "requires a container runtime".
+- ☁️ [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (2.32 or later, for `aws login`) and a recent 🦫 [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) with `--use-buildkit` (tested with 1.166). Older releases such as 1.146 can't talk to Docker Engine 29 and fail with "requires a container runtime".
     - AWS credentials: run `aws login`. It signs you in through the browser with your AWS console credentials, asks for a default region the first time, and stores short-lived credentials instead of long-lived access keys.
 - 🎞️ [ffmpeg](https://ffmpeg.org/) on your `PATH` to run the video Jevs locally (the images ship their own)
 - 🤖 [just](https://just.systems/) (optional), a command runner that can be installed with `uv tool install rust-just`, makes it easy to run, deploy, and manage Jevs locally and on AWS. See [Just](#just).
@@ -93,27 +93,27 @@ Each Jev stack is one container-image function with no public URL of its own. Yo
 
 **Cold starts.** Weights are downloaded while the image is built, so a cold start downloads nothing. The model is loaded on the first invoke rather than in the 10-second init phase: Lambda streams the image from ECR, and the GGUF weights are memory-mapped from it. That is why the timeout is the full 900 s. Warm invocations reuse the loaded model.
 
-**Memory sizing.** Each Jev's `MemorySize` in `template.yaml` is its measured peak RSS plus headroom: about 0.9 GB for SmolVLM2-500M, 2.4 GB for Qwen3-1.7B, and 4.8 GB for Gemma 4 E2B. Lambda allocates vCPUs in proportion to memory (6 vCPUs at 10,240 MB), and a forward pass is CPU-bound, so raising the memory up to 10,240 MB buys lower latency. New AWS accounts may be capped at 3,008 MB in every region until the quota is raised. Until then, `just max_mb=3008 deploy all` deploys the four Jevs that fit (`image`, `video`, `text-image`, `image-video`) and the gateway.
+**Memory sizing.** Each Jev's `MemorySize` in `template.yaml` is its measured peak RSS plus headroom: about 0.9 GB for [SmolVLM2-500M](https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF), 2.4 GB for [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF), and 4.8 GB for [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF). Lambda allocates vCPUs in proportion to memory (6 vCPUs at 10,240 MB), and a forward pass is CPU-bound, so raising the memory up to 10,240 MB buys lower latency. New AWS accounts may be capped at 3,008 MB in every region until the quota is raised. Until then, `just max_mb=3008 deploy all` deploys the five Jevs that fit (`text`, `image`, `video`, `text-image`, `image-video`) and the gateway.
 
 Every folder runs on **llama-cpp-python** with GGUF weights, plus a multimodal projector (`mmproj`) fed through libmtmd for image and audio. None needed the `transformers` fallback.
 
 | Modalities | Demo task | Options | Model (GGUF) | Backend | Memory |
 | --- | --- | --- | --- | --- | --- |
-| [📝](text/ "text") | Email triage | legitimate · spam · phishing | Qwen3-1.7B Q8_0 | llama-cpp-python | 4096 MB |
-| [🖼️](image/ "image") | Chart type | bar · line · pie · scatter | SmolVLM2-500M-Video Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
-| [🔊](audio/ "audio") | Voicemail intent | billing · cancel · support · sales | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [🎬](video/ "video") | Installer outcome from a screen recording | succeeded · failed · still running | SmolVLM2-500M-Video Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
-| [📝🖼️](text-image/ "text-image") | Expense category from note + receipt | meals · travel · lodging · office supplies | SmolVLM2-500M-Video Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
-| [📝🔊](text-audio/ "text-audio") | Customer's spoken reply to an order read-back | confirms · wants changes · cancels | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [📝🎬](text-video/ "text-video") | Does a screen recording reproduce a bug report? | reproduced · not reproduced | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [🖼️🔊](image-audio/ "image-audio") | Spoken command → button on screen | Save · Don't Save · Cancel | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [🖼️🎬](image-video/ "image-video") | Does a reference logo appear in a clip? | present · absent | SmolVLM2-500M-Video Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
-| [🔊🎬](audio-video/ "audio-video") | Ad compliance: spoken vs on-screen price | match · differ | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [📝🖼️🔊](text-image-audio/ "text-image-audio") | Support ticket routing (subject + screenshot + voice note) | billing · account access · bug · feature | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [📝🖼️🎬](text-image-video/ "text-image-video") | Missing-parcel claim (claim + delivery photo + doorbell cam) | never delivered · stolen · still there | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [📝🔊🎬](text-audio-video/ "text-audio-video") | Fact-check a claim against a recorded talk | supported · refuted · not enough info | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [🖼️🔊🎬](image-audio-video/ "image-audio-video") | Return triage (listing photo + unboxing clip) | as described · damaged · wrong item | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
-| [📝🖼️🔊🎬](text-image-audio-video/ "text-image-audio-video") | Incident severity (alert + dashboard + narrated status page) | SEV1 · SEV2 · SEV3 | Gemma 4 E2B Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [📝](text/ "text") | Email triage | legitimate · spam · phishing | [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF) Q8_0 | llama-cpp-python | 3008 MB |
+| [🖼️](image/ "image") | Chart type | bar · line · pie · scatter | [SmolVLM2-500M-Video](https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF) Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
+| [🔊](audio/ "audio") | Voicemail intent | billing · cancel · support · sales | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [🎬](video/ "video") | Installer outcome from a screen recording | succeeded · failed · still running | [SmolVLM2-500M-Video](https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF) Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
+| [📝🖼️](text-image/ "text-image") | Expense category from note + receipt | meals · travel · lodging · office supplies | [SmolVLM2-500M-Video](https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF) Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
+| [📝🔊](text-audio/ "text-audio") | Customer's spoken reply to an order read-back | confirms · wants changes · cancels | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [📝🎬](text-video/ "text-video") | Does a screen recording reproduce a bug report? | reproduced · not reproduced | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [🖼️🔊](image-audio/ "image-audio") | Spoken command → button on screen | Save · Don't Save · Cancel | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [🖼️🎬](image-video/ "image-video") | Does a reference logo appear in a clip? | present · absent | [SmolVLM2-500M-Video](https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF) Q8_0 + mmproj | llama-cpp-python + mtmd | 3008 MB |
+| [🔊🎬](audio-video/ "audio-video") | Ad compliance: spoken vs on-screen price | match · differ | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [📝🖼️🔊](text-image-audio/ "text-image-audio") | Support ticket routing (subject + screenshot + voice note) | billing · account access · bug · feature | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [📝🖼️🎬](text-image-video/ "text-image-video") | Missing-parcel claim (claim + delivery photo + doorbell cam) | never delivered · stolen · still there | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [📝🔊🎬](text-audio-video/ "text-audio-video") | Fact-check a claim against a recorded talk | supported · refuted · not enough info | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [🖼️🔊🎬](image-audio-video/ "image-audio-video") | Return triage (listing photo + unboxing clip) | as described · damaged · wrong item | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
+| [📝🖼️🔊🎬](text-image-audio-video/ "text-image-audio-video") | Incident severity (alert + dashboard + narrated status page) | SEV1 · SEV2 · SEV3 | [Gemma 4 E2B](https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF) Q4_0 + mmproj | llama-cpp-python + mtmd | 8192 MB |
 
 ## License
 
