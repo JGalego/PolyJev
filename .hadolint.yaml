@@ -1,0 +1,5 @@
+ignored:
+  # COPY to a relative path: the Lambda base image already sets WORKDIR /var/task.
+  - DL3045
+  # Unpinned apk add: only in the throwaway stage that unpacks ffmpeg; Alpine drops old versions, so pins break builds.
+  - DL3018

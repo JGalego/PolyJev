@@ -47,8 +47,11 @@ Resources:
         - S3CrudPolicy: {BucketName: !Ref Jobs}
         - Statement:
             - Effect: Allow
-              Action: lambda:InvokeFunction # the Jevs, and itself for the async half
+              Action: [lambda:InvokeFunction, lambda:GetFunction] # the Jevs, and itself for the async half
               Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:polyjev-*
+            - Effect: Allow
+              Action: lambda:ListFunctions # GET /jevs: which Jevs are deployed; this action takes no resource ARN
+              Resource: "*"
       LoggingConfig:
         LogGroup: !Ref Logs
       Events:
@@ -58,6 +61,12 @@ Resources:
             ApiId: !Ref Api
             Method: POST
             Path: /jevs/{jev}
+        Deployed:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Method: GET
+            Path: /jevs
         Poll:
           Type: HttpApi
           Properties:
@@ -120,7 +129,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
         CacheBehaviors:
-          - PathPattern: /jevs/*
+          - PathPattern: /jevs* # /jevs and /jevs/{jev}
             TargetOriginId: api
             ViewerProtocolPolicy: https-only
             AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]

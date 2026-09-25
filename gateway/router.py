@@ -1,4 +1,5 @@
-"""HTTP API router: POST /jevs/{jev} queues a job, GET /jobs/{job} returns its Probs when ready.
+"""HTTP API router: POST /jevs/{jev} queues a job, GET /jobs/{job} returns its Probs when ready,
+GET /jevs says which Jevs are deployed (a partial deploy skips the ones that need more memory).
 
 A Jev can outlive API Gateway's 30 s integration timeout (cold starts load GBs of weights), so the
 request is parked in S3 and this function re-invokes itself asynchronously to call polyjev-{jev}.
@@ -35,6 +36,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
         return work(event["job"], event["jev"])
     if not hmac.compare_digest(event.get("headers", {}).get("x-polyjev-token", ""), TOKEN):
         return respond(401, {"error": "missing or wrong x-polyjev-token header"})
+    if event.get("routeKey") == "GET /jevs":
+        return respond(200, {"jevs": {j: j in deployed() for j in sorted(JEVS)}})
     params: dict[str, str] = event.get("pathParameters") or {}
     if "jev" in params:
         return submit(params["jev"], event.get("body") or "", event.get("isBase64Encoded", False), context.function_name)
@@ -44,6 +47,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
 def submit(jev: str, body: str, b64: bool, me: str) -> dict[str, Any]:
     if jev not in JEVS:
         return respond(404, {"error": f"unknown jev {jev!r}", "jevs": sorted(JEVS)})
+    if not is_deployed(jev):
+        return respond(404, {"error": f"{jev} is not deployed", "deployed": False})
     job = str(uuid.uuid4())
     s3.put_object(Bucket=BUCKET, Key=f"in/{job}.json", Body=base64.b64decode(body) if b64 else body.encode())
     lam.invoke(FunctionName=me, InvocationType="Event", Payload=json.dumps({"job": job, "jev": jev}).encode())
@@ -57,9 +62,24 @@ def work(job: str, jev: str) -> None:
         result = json.loads(out["Payload"].read())
         if "FunctionError" in out:
             result = {"error": result.get("errorMessage", "the Jev failed")}
+    except lam.exceptions.ResourceNotFoundException:  # deleted after the job was queued
+        result = {"error": f"{jev} is not deployed", "deployed": False}
     except Exception as e:  # report every failure to the poller instead of leaving the job pending
         result = {"error": str(e)}
     s3.put_object(Bucket=BUCKET, Key=f"out/{job}.json", Body=json.dumps(result).encode())
+
+
+def deployed() -> set[str]:
+    names = (f.get("FunctionName", "") for page in lam.get_paginator("list_functions").paginate() for f in page["Functions"])
+    return {n.removeprefix("polyjev-") for n in names} & JEVS
+
+
+def is_deployed(jev: str) -> bool:
+    try:
+        lam.get_function(FunctionName=f"polyjev-{jev}")
+        return True
+    except lam.exceptions.ResourceNotFoundException:
+        return False
 
 
 def poll(job: str) -> dict[str, Any]:

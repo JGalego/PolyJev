@@ -5,9 +5,11 @@ beta_features = false
 
 [default.build.parameters]
 cached = false
+use_buildkit = true
 
 [default.deploy.parameters]
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = false
 fail_on_empty_changeset = false
 resolve_image_repos = true
+resolve_s3 = true

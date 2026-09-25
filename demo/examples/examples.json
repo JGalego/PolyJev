@@ -1,0 +1,317 @@
+{
+ "text": [
+  {
+   "label": "Legitimate: meeting notes",
+   "expect": "legitimate",
+   "text": "From: Priya Shah <priya.shah@northwind.com>\nSubject: Notes from Thursday's planning meeting\n\nHi all,\n\nThanks for joining on Thursday. Action items:\n- Marco: draft the Q4 hiring plan by the 14th\n- Lena: book the room for the offsite\n\nThe slides are in the team folder. Shout if I missed anything.\n\nPriya"
+  },
+  {
+   "label": "Legitimate: a colleague asks for a review",
+   "expect": "legitimate",
+   "text": "From: Lena Weber <lena.weber@northwind.com>\nSubject: Could you look at my pull request?\n\nHi Jo,\n\nI've opened the PR for the new export screen. It's not urgent, but it would be great to have your review before Friday's release.\nI left a couple of questions in the comments on the date formatting.\n\nThanks!\nLena"
+  },
+  {
+   "label": "Spam: miracle discount",
+   "expect": "spam",
+   "text": "From: Mega Deals <deals@best-offers-4u.biz>\nSubject: 🔥 90% OFF luxury watches, TODAY ONLY!!!\n\nDear Customer,\n\nYou have been SELECTED for our exclusive VIP sale. Genuine designer watches from just $19.99!\nFree shipping worldwide. Limited stock, act NOW!\n\nTo stop receiving these emails reply REMOVE."
+  },
+  {
+   "label": "Spam: newsletter you never signed up for",
+   "expect": "spam",
+   "text": "From: Crypto Insider <news@moonshot-signals.io>\nSubject: This coin will 100x before Friday\n\nOur analysts have found the next big thing. Early members already made $12,000 in one week.\nJoin 50,000 traders getting our daily picks. Not financial advice.\n\nUnsubscribe | Update preferences"
+  },
+  {
+   "label": "Phishing: fake parcel fee",
+   "expect": "phishing",
+   "text": "From: DHL Express <noreply@dhl-parcel-release.info>\nSubject: Your parcel is on hold: customs fee unpaid\n\nWe tried to deliver your parcel today but a customs fee of €1.99 is due.\nPay within 24 hours or it will be returned to the sender: http://dhl-parcel-release.info/pay\n\nDHL Customer Service"
+  },
+  {
+   "label": "Phishing: fake account lock",
+   "expect": "phishing",
+   "text": "From: PayPal Security <service@paypa1-account-review.com>\nSubject: Your account has been limited\n\nWe noticed unusual activity and have temporarily limited your account.\nTo restore access, log in and confirm your card details within 48 hours: http://paypa1-account-review.com/login\n\nPayPal Security Team"
+  }
+ ],
+ "image": [
+  {
+   "label": "Bar chart: bar data",
+   "expect": "bar chart",
+   "image": "image/bar.png"
+  },
+  {
+   "label": "Line chart: line data",
+   "expect": "line chart",
+   "image": "image/line.png"
+  },
+  {
+   "label": "Pie chart: pie data",
+   "expect": "pie chart",
+   "image": "image/pie.png"
+  },
+  {
+   "label": "Scatter plot: scatter data",
+   "expect": "scatter plot",
+   "image": "image/scatter.png"
+  }
+ ],
+ "audio": [
+  {
+   "label": "Billing: charged twice",
+   "expect": "billing question",
+   "audio": "audio/billing.wav"
+  },
+  {
+   "label": "Cancel: moving abroad",
+   "expect": "cancel subscription",
+   "audio": "audio/cancel.wav"
+  },
+  {
+   "label": "Support: app crashes",
+   "expect": "technical support",
+   "audio": "audio/support.wav"
+  },
+  {
+   "label": "Sales: team plan pricing",
+   "expect": "sales inquiry",
+   "audio": "audio/sales.wav"
+  }
+ ],
+ "video": [
+  {
+   "label": "Succeeded: finishes cleanly",
+   "expect": "succeeded",
+   "video": "video/succeeded.mp4"
+  },
+  {
+   "label": "Failed: error 1603 halfway",
+   "expect": "failed",
+   "video": "video/failed.mp4"
+  },
+  {
+   "label": "Still running: 70% when the clip ends",
+   "expect": "still running",
+   "video": "video/running.mp4"
+  }
+ ],
+ "text-image": [
+  {
+   "label": "Meals: client dinner",
+   "expect": "meals",
+   "text": "Expense note: dinner with the Contoso team after the pitch, 3 people.",
+   "image": "text-image/meals.png"
+  },
+  {
+   "label": "Travel: train to a client site",
+   "expect": "travel",
+   "text": "Expense note: train to the Boston client site for the kickoff.",
+   "image": "text-image/travel.png"
+  },
+  {
+   "label": "Lodging: hotel for the offsite",
+   "expect": "lodging",
+   "text": "Expense note: two nights for the Boston offsite.",
+   "image": "text-image/lodging.png"
+  },
+  {
+   "label": "Office supplies: printer paper and toner",
+   "expect": "office supplies",
+   "text": "Expense note: restocking the office printer.",
+   "image": "text-image/office.png"
+  }
+ ],
+ "text-audio": [
+  {
+   "label": "Confirms the order",
+   "expect": "confirms the order",
+   "text": "Agent: Just to confirm, order 2291 is one large pepperoni pizza and a garlic bread, delivered to 14 Elm Street. Shall I place it?",
+   "audio": "text-audio/confirms.wav"
+  },
+  {
+   "label": "Wants changes: different quantity and day",
+   "expect": "wants changes",
+   "text": "Agent: So that's order 1042, two standing desks, delivered on Tuesday. Shall I place it?",
+   "audio": "text-audio/changes.wav"
+  },
+  {
+   "label": "Cancels the order",
+   "expect": "cancels the order",
+   "text": "Agent: To confirm, order 3310 is a pair of running shoes, size 42, arriving Friday. Shall I place it?",
+   "audio": "text-audio/cancels.wav"
+  }
+ ],
+ "text-video": [
+  {
+   "label": "Reproduced: the error appears",
+   "expect": "reproduced",
+   "text": "Bug: clicking Export > Export as PDF shows an 'Export failed' error instead of saving the file.",
+   "video": "text-video/reproduced.mp4"
+  },
+  {
+   "label": "Not reproduced: the PDF saves",
+   "expect": "not reproduced",
+   "text": "Bug: clicking Export > Export as PDF shows an 'Export failed' error instead of saving the file.",
+   "video": "text-video/not-reproduced.mp4"
+  }
+ ],
+ "image-audio": [
+  {
+   "label": "Save: keep my changes",
+   "expect": "Save",
+   "image": "image-audio/dialog.png",
+   "audio": "image-audio/save.wav"
+  },
+  {
+   "label": "Don't Save: throw them away",
+   "expect": "Don't Save",
+   "image": "image-audio/dialog.png",
+   "audio": "image-audio/dont-save.wav"
+  },
+  {
+   "label": "Cancel: not done yet",
+   "expect": "Cancel",
+   "image": "image-audio/dialog.png",
+   "audio": "image-audio/cancel.wav"
+  }
+ ],
+ "image-video": [
+  {
+   "label": "Present: on a billboard mid-clip",
+   "expect": "present",
+   "image": "image-video/logo.png",
+   "video": "image-video/present.mp4"
+  },
+  {
+   "label": "Absent: only other brands appear",
+   "expect": "absent",
+   "image": "image-video/logo.png",
+   "video": "image-video/absent.mp4"
+  }
+ ],
+ "audio-video": [
+  {
+   "label": "Prices match: $149 on screen and said",
+   "expect": "prices match",
+   "video": "audio-video/match.mp4"
+  },
+  {
+   "label": "Prices differ: $149 on screen, $99 said",
+   "expect": "prices differ",
+   "video": "audio-video/differ.mp4"
+  }
+ ],
+ "text-image-audio": [
+  {
+   "label": "Billing: charged twice",
+   "expect": "billing",
+   "text": "Subject: charged twice for September",
+   "image": "text-image-audio/billing.png",
+   "audio": "text-image-audio/billing.wav"
+  },
+  {
+   "label": "Account access: locked out",
+   "expect": "account access",
+   "text": "Subject: can't sign in after resetting my password",
+   "image": "text-image-audio/access.png",
+   "audio": "text-image-audio/access.wav"
+  },
+  {
+   "label": "Bug report: blank revenue chart",
+   "expect": "bug report",
+   "text": "Subject: revenue chart is empty since the update",
+   "image": "text-image-audio/bug.png",
+   "audio": "text-image-audio/bug.wav"
+  },
+  {
+   "label": "Feature request: dark mode",
+   "expect": "feature request",
+   "text": "Subject: please add a dark mode",
+   "image": "text-image-audio/feature.png",
+   "audio": "text-image-audio/feature.wav"
+  }
+ ],
+ "text-image-video": [
+  {
+   "label": "Never delivered: photo shows another door",
+   "expect": "never delivered",
+   "text": "Customer: the app says my parcel was delivered at 2:14 pm, but I can't find it anywhere.",
+   "image": "text-image-video/never.png",
+   "video": "text-image-video/never.mp4"
+  },
+  {
+   "label": "Stolen after delivery: someone takes it",
+   "expect": "stolen after delivery",
+   "text": "Customer: the app says my parcel was delivered at 2:14 pm, but I can't find it anywhere.",
+   "image": "text-image-video/stolen.png",
+   "video": "text-image-video/stolen.mp4"
+  },
+  {
+   "label": "Still at the door: never moved",
+   "expect": "still at the door",
+   "text": "Customer: the app says my parcel was delivered at 2:14 pm, but I can't find it anywhere.",
+   "image": "text-image-video/at-door.png",
+   "video": "text-image-video/at-door.mp4"
+  }
+ ],
+ "text-audio-video": [
+  {
+   "label": "Supported: revenue grew 12%",
+   "expect": "supported",
+   "text": "Claim: the company's revenue grew by 12% last quarter.",
+   "video": "text-audio-video/talk.mp4"
+  },
+  {
+   "label": "Refuted: revenue fell",
+   "expect": "refuted",
+   "text": "Claim: the company reported that revenue fell last quarter.",
+   "video": "text-audio-video/talk.mp4"
+  },
+  {
+   "label": "Not enough information: hiring plans",
+   "expect": "not enough information",
+   "text": "Claim: the company plans to hire 200 engineers next year.",
+   "video": "text-audio-video/talk.mp4"
+  }
+ ],
+ "image-audio-video": [
+  {
+   "label": "As described: changed my mind",
+   "expect": "item as described",
+   "image": "image-audio-video/listing.png",
+   "video": "image-audio-video/as-described.mp4"
+  },
+  {
+   "label": "Damaged: handle snapped off",
+   "expect": "item damaged",
+   "image": "image-audio-video/listing.png",
+   "video": "image-audio-video/damaged.mp4"
+  },
+  {
+   "label": "Wrong item: a red teapot",
+   "expect": "wrong item",
+   "image": "image-audio-video/listing.png",
+   "video": "image-audio-video/wrong.mp4"
+  }
+ ],
+ "text-image-audio-video": [
+  {
+   "label": "SEV1: checkout is down",
+   "expect": "SEV1: outage, customers blocked",
+   "text": "Alert: checkout-api error rate at 100% for 10 minutes; every payment attempt fails.",
+   "image": "text-image-audio-video/sev1.png",
+   "video": "text-image-audio-video/sev1.mp4"
+  },
+  {
+   "label": "SEV2: search is slow",
+   "expect": "SEV2: degraded, customers affected",
+   "text": "Alert: search-api p95 latency 4.8 s for 15 minutes (normal: 300 ms).",
+   "image": "text-image-audio-video/sev2.png",
+   "video": "text-image-audio-video/sev2.mp4"
+  },
+  {
+   "label": "SEV3: internal report delayed",
+   "expect": "SEV3: minor, no customer impact",
+   "text": "Alert: nightly-export job failed; internal finance report delayed.",
+   "image": "text-image-audio-video/sev3.png",
+   "video": "text-image-audio-video/sev3.mp4"
+  }
+ ]
+}

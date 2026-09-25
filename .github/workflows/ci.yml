@@ -9,3 +9,11 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pyright
       - run: uv run pytest -q gateway
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: hadolint
+        run: docker run --rm -v "$PWD":/w -w /w hadolint/hadolint:v2.12.0 hadolint */Dockerfile
+      - name: shellcheck
+        run: docker run --rm -v "$PWD":/w -w /w koalaman/shellcheck:v0.10.0 scripts/*.sh

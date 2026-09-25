@@ -13,7 +13,7 @@ Mappings:
   # Peak RSS plus headroom: ~0.9 GB SmolVLM2-500M, ~2.4 GB Qwen3-1.7B, ~4.8 GB Gemma 4 E2B.
   # Lambda gives CPU in proportion to memory, so extra memory also means faster inference.
   Memory:
-    text: {MB: 4096}
+    text: {MB: 3008}
     image: {MB: 3008}
     audio: {MB: 8192}
     video: {MB: 3008}

@@ -24,7 +24,7 @@ llama-cpp-python = { index = "llama-cpp" }
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
-exclude = [".venv"]
+exclude = [".venv", "docs", "demo/examples/make.py"]  # standalone uv scripts with their own dependencies
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

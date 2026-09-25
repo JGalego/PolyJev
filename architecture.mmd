@@ -1,0 +1,12 @@
+flowchart LR
+    dev["Developer<br/>make deploy JEV=…"] -- "sam build (arm64) + push" --> ecr[("Amazon ECR<br/>image with baked-in weights")]
+    ecr -- "sam deploy" --> fn["AWS Lambda container<br/>polyjev-JEV (×15)<br/>handler → Jev → Probs"]
+    dev -. "make test<br/>aws lambda invoke" .-> fn
+    user["Browser / curl"] --> cdn["Amazon CloudFront"]
+    cdn -- "/, /JEV/sample.*" --> site[("S3 site bucket<br/>demo app + samples")]
+    cdn -- "POST /jevs/JEV<br/>GET /jobs/ID" --> api["Amazon API Gateway<br/>HTTP API"]
+    api --> router["Lambda<br/>polyjev-gateway"]
+    router -- "request / Probs" --> s3[("S3 job bucket<br/>expires in 1 day")]
+    router -- "async self-invoke,<br/>then invoke" --> fn
+    fn -- "logs" --> cw["CloudWatch Logs"]
+    router -- "logs" --> cw
